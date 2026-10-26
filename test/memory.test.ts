@@ -14,6 +14,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { totalmem, freemem } from "node:os";
 
 import { readMemory, formatBytes, parseVmStat, parseMeminfo } from "../src/memory.ts";
@@ -69,9 +70,12 @@ test("a real reading is available and internally consistent", async () => {
 	);
 });
 
-test("the total matches what the platform reports", async () => {
+test("the total matches the platform's own accounting", async () => {
 	const sample = await readMemory();
-	assert.equal(sample.totalBytes, totalmem());
+	// On Linux the reader reports MemTotal, which differs from os.totalmem()
+	// under a cgroup limit, so the expected figure comes from the same file.
+	const meminfo = process.platform === "linux" ? parseMeminfo(await readFile("/proc/meminfo", "utf8")) : null;
+	assert.equal(sample.totalBytes, meminfo ? meminfo.totalBytes : totalmem());
 });
 
 test("a real reading does not count reclaimable cache as used", async () => {
