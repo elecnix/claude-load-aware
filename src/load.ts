@@ -33,6 +33,17 @@ export type LoadSample = {
 	detail?: string;
 };
 
+export type LoadReaderOptions = {
+	/** Overrides process.platform. Injected for tests. */
+	platform?: NodeJS.Platform;
+	/** Injected for tests. Defaults to os.loadavg. */
+	loadavgImpl?: () => number[];
+	/** Injected for tests. Defaults to fs.readFile(path, "utf8"). */
+	readFileImpl?: (path: string) => Promise<string>;
+	/** Injected for tests. Returns stdout. Defaults to execFile with a 2 second timeout. */
+	execFileImpl?: (file: string, args: string[]) => Promise<string>;
+};
+
 function triple(values: unknown): [number, number, number] | null {
 	if (!Array.isArray(values) || values.length < 3) return null;
 	const parsed = values.slice(0, 3).map((value) => Number(value));
@@ -40,29 +51,33 @@ function triple(values: unknown): [number, number, number] | null {
 	return [parsed[0], parsed[1], parsed[2]];
 }
 
-async function fromOs(): Promise<[number, number, number] | null> {
+async function fromOs(options: LoadReaderOptions): Promise<[number, number, number] | null> {
 	try {
-		if (process.platform === "win32") return null;
-		return triple(loadavg());
+		if ((options.platform ?? process.platform) === "win32") return null;
+		return triple((options.loadavgImpl ?? loadavg)());
 	} catch {
 		return null;
 	}
 }
 
-async function fromProc(): Promise<[number, number, number] | null> {
+async function fromProc(options: LoadReaderOptions): Promise<[number, number, number] | null> {
 	try {
-		const contents = await readFile("/proc/loadavg", "utf8");
+		const read = options.readFileImpl ?? ((path: string) => readFile(path, "utf8"));
+		const contents = await read("/proc/loadavg");
 		return triple(contents.trim().split(/\s+/));
 	} catch {
 		return null;
 	}
 }
 
-async function fromSysctl(): Promise<[number, number, number] | null> {
-	if (process.platform === "win32") return null;
+async function fromSysctl(options: LoadReaderOptions): Promise<[number, number, number] | null> {
+	if ((options.platform ?? process.platform) === "win32") return null;
 	try {
 		// macOS and BSD: "{ 1.82 2.01 2.10 }"
-		const { stdout } = await execFileAsync("sysctl", ["-n", "vm.loadavg"], { timeout: 2000 });
+		const run =
+			options.execFileImpl ??
+			(async (file: string, args: string[]) => (await execFileAsync(file, args, { timeout: 2000 })).stdout);
+		const stdout = await run("sysctl", ["-n", "vm.loadavg"]);
 		return triple(stdout.replace(/[{}]/g, " ").trim().split(/\s+/));
 	} catch {
 		return null;
@@ -73,11 +88,11 @@ async function fromSysctl(): Promise<[number, number, number] | null> {
  * Read the current load averages. Never throws: a failure to read load is
  * reported as `available: false` so callers can stay quiet rather than guess.
  */
-export async function readLoad(): Promise<LoadSample> {
+export async function readLoad(options: LoadReaderOptions = {}): Promise<LoadSample> {
 	const attempts: Array<[LoadSource, () => Promise<[number, number, number] | null>]> = [
-		["os.loadavg", fromOs],
-		["/proc/loadavg", fromProc],
-		["sysctl", fromSysctl],
+		["os.loadavg", () => fromOs(options)],
+		["/proc/loadavg", () => fromProc(options)],
+		["sysctl", () => fromSysctl(options)],
 	];
 
 	for (const [source, attempt] of attempts) {
@@ -93,6 +108,6 @@ export async function readLoad(): Promise<LoadSample> {
 		load5: 0,
 		load15: 0,
 		source: "unavailable",
-		detail: `no load source answered on ${process.platform}`,
+		detail: `no load source answered on ${options.platform ?? process.platform}`,
 	};
 }
