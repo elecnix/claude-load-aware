@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /path/to/claude-load-aware/hook.ts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /path/to/claude-load-aware/hook.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

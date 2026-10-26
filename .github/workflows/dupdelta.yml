@@ -1,0 +1,45 @@
+# Reports only the code duplication this pull request introduces: the branch
+# and its merge-base are scanned, and the two reports are diffed. Duplication
+# the repository already had stays quiet, so the check can be clean
+# indefinitely on a codebase that has plenty of it.
+#
+# Advisory, and structurally so: dupdelta never fails on findings, so this
+# check cannot go red over a similarity heuristic. Extract the shared logic, or
+# leave it if the resemblance is coincidental — there is nothing to accept and
+# no allowlist to update.
+name: dupdelta
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # One scan per pull request; a push supersedes the run it replaced rather
+  # than queueing behind it. Nothing is published, so cancelling is free.
+  group: dupdelta-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dupdelta:
+    runs-on: ubuntu-latest
+    steps:
+      # No fork guard: dupdelta writes nothing through the API. Its findings
+      # are workflow-command annotations and a job summary, which a read-only
+      # token on a fork pull request can still emit.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # The merge-base has to be reachable. A shallow clone has no common
+          # ancestor to compare against, and the action fails loudly rather
+          # than reporting every pre-existing duplicate as new.
+          fetch-depth: 0
+          persist-credentials: false
+      # A tag rather than a SHA, which is the exception to how the other
+      # actions here are pinned: dupdelta picks which release binary to
+      # download from the ref it was called with, and a commit SHA names no
+      # release — pinning one would silently fall back to `latest` with only a
+      # ::notice:: to say so, so the detector would drift while looking pinned.
+      # An exact tag names its own release and pins it.
+      - uses: elecnix/dupdelta@v0.3.0
