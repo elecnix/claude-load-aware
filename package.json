@@ -24,6 +24,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "test:claude": "node --test test/claude.test.ts",
     "test": "node --test test/signals.test.ts test/load.test.ts test/memory.test.ts test/swap.test.ts test/io.test.ts test/config.test.ts test/state.test.ts test/hook.test.ts test/wiring.test.ts"
   },
   "devDependencies": {

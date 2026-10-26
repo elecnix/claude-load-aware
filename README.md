@@ -121,6 +121,12 @@ A load threshold equal to the CPU count means the machine has as many runnable t
 
 With `enabled` set to `false`, the hook exits before sampling and returns no context.
 
+## Tests against real Claude Code
+
+`npm run test:claude` runs `hook.ts` inside a real Claude Code binary when `CLAUDE_BIN` points at one, and skips otherwise. One test works without credentials. Claude Code runs `UserPromptSubmit` hooks before it calls the API, so an invalid key still shows the hook's answer in the event stream. Two more send real prompts and check that the model receives the message in the run that produced it, once at `UserPromptSubmit` and once at `PostToolUse`. They run only when `ANTHROPIC_API_KEY` is set.
+
+The `claude` workflow installs Claude Code 2.1.308 and runs that command on every push and pull request. Add an `ANTHROPIC_API_KEY` repository secret to turn on the model tests. Pull requests from forks have no secret, so those tests skip there.
+
 ## Limitations
 
 - Each Claude Code session monitors itself, and the hook has no view of other sessions or of other machines.
