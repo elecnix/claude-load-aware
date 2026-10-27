@@ -1,0 +1,34 @@
+{
+  "name": "claude-load-aware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Claude Code hooks that add machine load, memory, swap and disk I/O pressure to the current turn when any of them changes band",
+  "keywords": [
+    "claude-code",
+    "hooks",
+    "load-average",
+    "memory",
+    "swap",
+    "psi",
+    "io-pressure",
+    "monitoring"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elecnix/claude-load-aware.git"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test:claude": "node --test test/claude.test.ts",
+    "test": "node --test test/signals.test.ts test/load.test.ts test/memory.test.ts test/swap.test.ts test/io.test.ts test/config.test.ts test/state.test.ts test/hook.test.ts test/wiring.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,41 @@
+# Cite reviews the pull request through the GitHub API. It needs no checkout of
+# the pull-request head and executes nothing from it: the workflow runs on a
+# hosted runner, holds the model key, and reads only the diff.
+#
+# Ollama Cloud is the default provider for the whole fleet, and the
+# CITE_PROVIDER repository variable flips this repository to OpenRouter without
+# a file change. Both keys are set on the repository, so the switch is one
+# `gh variable set` away.
+name: review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  # One review per pull request at a time. Publishing is idempotent, so a
+  # superseded run can be cancelled rather than queued behind its successor.
+  group: cite-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Review this pull request with Cite
+        uses: elecnix/cite@f5707676437aacf2d3566d0e831c5c558717f994 # v0.15.0
+        with:
+          # The pin is a full SHA on purpose: an unset `version:` input makes
+          # the action download the release its pin belongs to, so the SHA
+          # pins the binary and not just the action definition. A tag would
+          # leave the reviewer's own behaviour free to change under this
+          # repository.
+          structured_output: ${{ vars.CITE_PROVIDER == 'openrouter' && 'response_format' || 'tools' }}
+          require_parameters: ${{ vars.CITE_PROVIDER == 'openrouter' }}
+          model_api_key: ${{ vars.CITE_PROVIDER == 'openrouter' && secrets.MODEL_API_KEY || secrets.OLLAMA_API_KEY }}
+          model_base_url: ${{ vars.CITE_PROVIDER == 'openrouter' && 'https://openrouter.ai/api/v1' || 'https://ollama.com/v1' }}
+          model_id: ${{ vars.CITE_PROVIDER == 'openrouter' && 'deepseek/deepseek-v4-flash-0731' || 'deepseek-v4.1-flash' }}

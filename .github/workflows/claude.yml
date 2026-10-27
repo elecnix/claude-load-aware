@@ -1,0 +1,47 @@
+# Runs the hook inside the pinned Claude Code release. The keyless test needs
+# no secret: Claude Code runs UserPromptSubmit hooks before it calls the API,
+# so an invalid key still shows the hook's answer in the event stream. The
+# model tests send real prompts and run only when the repository has an
+# ANTHROPIC_API_KEY secret. Without it they skip and the job stays green.
+name: claude
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Every behavioural claim in the README is pinned to this version.
+  CLAUDE_CODE_VERSION: 2.1.308
+
+jobs:
+  real-claude:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install the pinned Claude Code
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/claude" "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+          echo "CLAUDE_BIN=$RUNNER_TEMP/claude/bin/claude" >> "$GITHUB_ENV"
+      - name: Check the installed version
+        run: test "$("$CLAUDE_BIN" --version | cut -d' ' -f1)" = "$CLAUDE_CODE_VERSION"
+      - name: Test the hook against real Claude Code
+        env:
+          # Secrets are empty on pull requests from forks, which skips the model tests.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run test:claude
