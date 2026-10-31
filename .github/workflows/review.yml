@@ -1,12 +1,10 @@
-# Cite reviews the pull request through the GitHub API. It needs no checkout of
-# the pull-request head and executes nothing from it: the workflow runs on a
-# hosted runner, holds the model key, and reads only the diff.
-#
-# Ollama Cloud is the default provider for the whole fleet, and the
-# CITE_PROVIDER repository variable flips this repository to OpenRouter without
-# a file change. Both keys are set on the repository, so the switch is one
-# `gh variable set` away.
 name: review
+
+# One shape across the fleet. The endpoint, the model and the structured-output
+# mode are repository variables, so retargeting this repository is three
+# variable edits and never a workflow edit; the credential is one secret. The
+# action is pinned to a full commit SHA, which also pins the release binary it
+# downloads, and the run log prints the endpoint and model it used.
 
 on:
   pull_request:
@@ -17,8 +15,6 @@ permissions:
   checks: write
 
 concurrency:
-  # One review per pull request at a time. Publishing is idempotent, so a
-  # superseded run can be cancelled rather than queued behind its successor.
   group: cite-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
@@ -27,15 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Review this pull request with Cite
-        uses: elecnix/cite@f5707676437aacf2d3566d0e831c5c558717f994 # v0.15.0
+        uses: elecnix/cite@e790f27116e76c26aa8b4f6c6437c5bec6c5cc30 # v0.16.0
         with:
-          # The pin is a full SHA on purpose: an unset `version:` input makes
-          # the action download the release its pin belongs to, so the SHA
-          # pins the binary and not just the action definition. A tag would
-          # leave the reviewer's own behaviour free to change under this
-          # repository.
-          structured_output: ${{ vars.CITE_PROVIDER == 'openrouter' && 'response_format' || 'tools' }}
-          require_parameters: ${{ vars.CITE_PROVIDER == 'openrouter' }}
-          model_api_key: ${{ vars.CITE_PROVIDER == 'openrouter' && secrets.MODEL_API_KEY || secrets.OLLAMA_API_KEY }}
-          model_base_url: ${{ vars.CITE_PROVIDER == 'openrouter' && 'https://openrouter.ai/api/v1' || 'https://ollama.com/v1' }}
-          model_id: ${{ vars.CITE_PROVIDER == 'openrouter' && 'deepseek/deepseek-v4-flash-0731' || 'deepseek-v4.1-flash' }}
+          model_api_key: ${{ secrets.REVIEW_MODEL_API_KEY }}
+          model_base_url: ${{ vars.REVIEW_MODEL_BASE_URL }}
+          model_id: ${{ vars.REVIEW_MODEL_ID }}
+          structured_output: ${{ vars.REVIEW_MODEL_STRUCTURED_OUTPUT }}
+
